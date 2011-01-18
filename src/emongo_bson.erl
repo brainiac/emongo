@@ -47,7 +47,7 @@ encode_key_value(Key, Val) when is_binary(Val) orelse Val == [] orelse (is_list(
 		Val1 ->
 			<<2, Key1/binary, 0, (byte_size(Val1)+1):32/little-signed, Val1/binary, 0:8>>
 	end;
-	
+		
 %% NESTED OBJECT
 encode_key_value(Key, [{_,_}|_]=Val) ->
 	Key1 = encode_key(Key),
@@ -128,8 +128,13 @@ encode_key_value(Key, Val) when is_integer(Val) ->
 	Key1 = encode_key(Key),
 	<<18, Key1/binary, 0, Val:64/little-signed>>;
 	
+% TERM (user-defined binary)
 encode_key_value(Key, Val) ->
-	exit({oh_balls, Key, Val}).
+	Binary = term_to_binary(Val),
+	encode_key_value(Key, {binary, 128, Binary}).
+
+%encode_key_value(Key, Val) ->
+%	exit({oh_balls, Key, Val}).
 	
 encode_key(Key) when is_binary(Key) ->
 	Key;
@@ -196,7 +201,7 @@ decode_value(5, <<_Size:32/little-signed, 2:8/little, BinSize:32/little-signed, 
   	{{binary, 2, BinData}, Tail};
 
 decode_value(5, <<Size:32/little-signed, SubType:8/little, BinData:Size/binary-little-unit:8, Tail/binary>>) ->
-  	{{binary, SubType, BinData}, Tail};
+  	{decode_binary(SubType, BinData), Tail};
 
 %% OID
 decode_value(7, <<OID:12/binary, Tail/binary>>) ->
@@ -231,3 +236,10 @@ decode_value(18, <<Int:64/little-signed, Tail/binary>>) ->
 	
 decode_value(_, _) ->
 	exit(oh_fuck).
+
+
+decode_binary(128, BinData) ->
+	binary_to_term(BinData);
+
+decode_binary(SubType, BinData) ->
+	{binary, SubType, BinData}.
